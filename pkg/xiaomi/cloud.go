@@ -81,8 +81,8 @@ func resolverAddr(addr string) string {
 	}
 
 	ip := net.ParseIP(host)
-	if ip != nil && ip.IsLoopback() && ip.To4() == nil {
-		return net.JoinHostPort("127.0.0.1", port)
+	if ip != nil && ip.IsLoopback() {
+		return net.JoinHostPort("8.8.8.8", port)
 	}
 
 	return addr

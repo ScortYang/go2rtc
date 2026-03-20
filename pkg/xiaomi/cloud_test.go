@@ -22,11 +22,14 @@ func TestResolverNetwork(t *testing.T) {
 }
 
 func TestResolverAddr(t *testing.T) {
-	if got := resolverAddr("[::1]:53"); got != "127.0.0.1:53" {
+	if got := resolverAddr("[::1]:53"); got != "8.8.8.8:53" {
 		t.Fatalf("resolverAddr [::1]:53 = %q", got)
 	}
-	if got := resolverAddr("[::1]:1053"); got != "127.0.0.1:1053" {
+	if got := resolverAddr("[::1]:1053"); got != "8.8.8.8:1053" {
 		t.Fatalf("resolverAddr [::1]:1053 = %q", got)
+	}
+	if got := resolverAddr("127.0.0.1:53"); got != "8.8.8.8:53" {
+		t.Fatalf("resolverAddr 127.0.0.1:53 = %q", got)
 	}
 	if got := resolverAddr("8.8.8.8:53"); got != "8.8.8.8:53" {
 		t.Fatalf("resolverAddr keeps non-loopback addr, got %q", got)
