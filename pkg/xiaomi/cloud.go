@@ -24,6 +24,8 @@ import (
 	"github.com/AlexxIT/go2rtc/pkg/core"
 )
 
+const dnsDialerTimeout = 5 * time.Second
+
 type Cloud struct {
 	client *http.Client
 
@@ -44,7 +46,7 @@ func NewCloud(sid string) *Cloud {
 		Resolver: &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				dnsDialer := &net.Dialer{Timeout: 5 * time.Second}
+				dnsDialer := &net.Dialer{Timeout: dnsDialerTimeout}
 				return dnsDialer.DialContext(ctx, resolverNetwork(network), resolverAddr(addr))
 			},
 		},
@@ -73,9 +75,16 @@ func resolverNetwork(network string) string {
 }
 
 func resolverAddr(addr string) string {
-	if addr == "[::1]:53" {
-		return "127.0.0.1:53"
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
 	}
+
+	ip := net.ParseIP(host)
+	if ip != nil && ip.IsLoopback() && ip.To4() == nil {
+		return net.JoinHostPort("127.0.0.1", port)
+	}
+
 	return addr
 }
 
