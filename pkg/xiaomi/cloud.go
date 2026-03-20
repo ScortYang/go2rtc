@@ -8,6 +8,8 @@ import (
 	"crypto/rc4"
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -17,6 +19,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -52,12 +56,20 @@ func NewCloud(sid string) *Cloud {
 		},
 	}
 
+	tlsConfig := &tls.Config{}
+	if rootCAs := loadCertPool(); rootCAs != nil {
+		tlsConfig.RootCAs = rootCAs
+	}
+	// If loadCertPool() returns nil, RootCAs stays nil and Go will use its
+	// internal default cert pool loading on each TLS handshake.
+
 	return &Cloud{
 		client: &http.Client{
 			Timeout: 15 * time.Second,
 			Transport: &http.Transport{
-				Proxy:       http.ProxyFromEnvironment,
-				DialContext: dialer.DialContext,
+				Proxy:           http.ProxyFromEnvironment,
+				DialContext:     dialer.DialContext,
+				TLSClientConfig: tlsConfig,
 			},
 		},
 		sid: sid,
@@ -86,6 +98,27 @@ func resolverAddr(addr string) string {
 	}
 
 	return addr
+}
+
+// loadCertPool builds a certificate pool for TLS verification.
+// It starts with the system cert pool and also loads certificates from
+// $PREFIX/etc/tls/cert.pem when the PREFIX environment variable is set
+// (e.g. in Termux on Android, where CA certificates live under the Termux
+// prefix rather than the standard system paths).
+func loadCertPool() *x509.CertPool {
+	pool, _ := x509.SystemCertPool()
+	if pool == nil {
+		pool = x509.NewCertPool()
+	}
+
+	if prefix := os.Getenv("PREFIX"); prefix != "" {
+		certFile := filepath.Join(prefix, "etc", "tls", "cert.pem")
+		if data, err := os.ReadFile(certFile); err == nil {
+			pool.AppendCertsFromPEM(data)
+		}
+	}
+
+	return pool
 }
 
 func (c *Cloud) Login(username, password string) error {
