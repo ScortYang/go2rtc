@@ -8,6 +8,8 @@ import (
 	"crypto/rc4"
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -52,12 +54,20 @@ func NewCloud(sid string) *Cloud {
 		},
 	}
 
+	tlsConfig := &tls.Config{}
+	if rootCAs, err := x509.SystemCertPool(); err == nil {
+		tlsConfig.RootCAs = rootCAs
+	}
+	// If SystemCertPool() fails, RootCAs stays nil and Go will use its
+	// internal default cert pool loading on each TLS handshake.
+
 	return &Cloud{
 		client: &http.Client{
 			Timeout: 15 * time.Second,
 			Transport: &http.Transport{
-				Proxy:       http.ProxyFromEnvironment,
-				DialContext: dialer.DialContext,
+				Proxy:           http.ProxyFromEnvironment,
+				DialContext:     dialer.DialContext,
+				TLSClientConfig: tlsConfig,
 			},
 		},
 		sid: sid,

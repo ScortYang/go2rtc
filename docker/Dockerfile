@@ -33,7 +33,7 @@ FROM python:${PYTHON_VERSION}-alpine AS base
 # and other common tools for the echo source.
 # alsa-plugins-pulse for ALSA support (+0MB)
 # font-droid for FFmpeg drawtext filter (+2MB)
-RUN apk add --no-cache tini ffmpeg ffplay bash curl jq alsa-plugins-pulse font-droid
+RUN apk add --no-cache tini ffmpeg ffplay bash curl jq alsa-plugins-pulse font-droid ca-certificates
 
 # Hardware Acceleration for Intel CPU (+50MB)
 ARG TARGETARCH
