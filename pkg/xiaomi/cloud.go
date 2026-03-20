@@ -2,6 +2,7 @@ package xiaomi
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/rc4"
@@ -14,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-    "context"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -38,30 +38,45 @@ type Cloud struct {
 }
 
 func NewCloud(sid string) *Cloud {
-    tr := &http.Transport{
-        Proxy: http.ProxyFromEnvironment,
-        DialContext: (&net.Dialer{
-            Timeout:   15 * time.Second,
-            KeepAlive: 30 * time.Second,
-        }).DialContext, // 先占位，下面用 tcp4 包一层更清晰
-    }
+	dialer := &net.Dialer{
+		Timeout:   15 * time.Second,
+		KeepAlive: 30 * time.Second,
+		Resolver: &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				dnsDialer := &net.Dialer{Timeout: 5 * time.Second}
+				return dnsDialer.DialContext(ctx, resolverNetwork(network), resolverAddr(addr))
+			},
+		},
+	}
 
-    // 强制 tcp4
-    d := &net.Dialer{
-        Timeout:   15 * time.Second,
-        KeepAlive: 30 * time.Second,
-    }
-    tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-        return d.DialContext(ctx, "tcp4", addr)
-    }
+	return &Cloud{
+		client: &http.Client{
+			Timeout: 15 * time.Second,
+			Transport: &http.Transport{
+				Proxy:       http.ProxyFromEnvironment,
+				DialContext: dialer.DialContext,
+			},
+		},
+		sid: sid,
+	}
+}
 
-    return &Cloud{
-        client: &http.Client{
-            Timeout:   15 * time.Second,
-            Transport: tr,
-        },
-        sid: sid,
-    }
+func resolverNetwork(network string) string {
+	switch network {
+	case "udp", "udp4", "udp6":
+		return "udp4"
+	case "tcp", "tcp4", "tcp6":
+		return "tcp4"
+	}
+	return network
+}
+
+func resolverAddr(addr string) string {
+	if addr == "[::1]:53" {
+		return "127.0.0.1:53"
+	}
+	return addr
 }
 
 func (c *Cloud) Login(username, password string) error {
