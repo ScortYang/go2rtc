@@ -36,10 +36,30 @@ type Cloud struct {
 }
 
 func NewCloud(sid string) *Cloud {
-	return &Cloud{
-		client: &http.Client{Timeout: 15 * time.Second},
-		sid:    sid,
-	}
+    tr := &http.Transport{
+        Proxy: http.ProxyFromEnvironment,
+        DialContext: (&net.Dialer{
+            Timeout:   15 * time.Second,
+            KeepAlive: 30 * time.Second,
+        }).DialContext, // 先占位，下面用 tcp4 包一层更清晰
+    }
+
+    // 强制 tcp4
+    d := &net.Dialer{
+        Timeout:   15 * time.Second,
+        KeepAlive: 30 * time.Second,
+    }
+    tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+        return d.DialContext(ctx, "tcp4", addr)
+    }
+
+    return &Cloud{
+        client: &http.Client{
+            Timeout:   15 * time.Second,
+            Transport: tr,
+        },
+        sid: sid,
+    }
 }
 
 func (c *Cloud) Login(username, password string) error {
